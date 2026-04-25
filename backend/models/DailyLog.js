@@ -37,6 +37,11 @@ const dailyLogSchema = new mongoose.Schema(
       default: '',
       trim:    true,
     },
+    weight: {
+      type:    Number,
+      min:     0,
+      default: null,
+    },
   },
   { timestamps: true }
 );
