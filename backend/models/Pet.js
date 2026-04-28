@@ -1,40 +1,58 @@
-/**
- * Pet.js — Mongoose Model
- * -----------------------
- * Represents a pet profile in the database.
- * Includes embedded weightHistory subdocuments.
- */
-const mongoose = require('mongoose');
-
-/* ── Subdocument: Weight Entry ──────────────────────────── */
-const weightEntrySchema = new mongoose.Schema(
-  {
-    date:   { type: Date,   required: true, default: Date.now },
-    weight: { type: Number, required: true, min: 0 },
-  },
-  { _id: true }
-);
-
-/* ── Main Schema ─────────────────────────────────────────── */
-const petSchema = new mongoose.Schema(
-  {
-    name:    { type: String, required: [true, 'Pet name is required'], trim: true },
-    species: {
-      type: String,
-      required: true,
-      enum: ['Dog', 'Cat', 'Bird', 'Rabbit', 'Hamster', 'Fish', 'Reptile', 'Other'],
-      default: 'Dog',
+module.exports = (sequelize, DataTypes) => {
+  const Pet = sequelize.define('Pet', {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    breed:         { type: String, trim: true, default: '' },
-    age:           { type: Number, min: 0, max: 100 },
-    gender:        { type: String, enum: ['Male', 'Female', 'Unknown'], default: 'Unknown' },
-    color:         { type: String, default: '' },
-    microchipId:   { type: String, default: '' },
-    ownerName:     { type: String, required: true, trim: true },
-    avatarUrl:     { type: String, default: '' },           // S3 / Cloudinary URL
-    weightHistory: { type: [weightEntrySchema], default: [] },
-  },
-  { timestamps: true }
-);
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: { notEmpty: true },
+    },
+    species: {
+      type: DataTypes.ENUM('Dog', 'Cat', 'Bird', 'Rabbit', 'Hamster', 'Fish', 'Reptile', 'Other'),
+      allowNull: false,
+      defaultValue: 'Dog',
+    },
+    breed: {
+      type: DataTypes.STRING,
+      defaultValue: '',
+    },
+    age: {
+      type: DataTypes.INTEGER,
+      validate: { min: 0, max: 100 },
+    },
+    gender: {
+      type: DataTypes.ENUM('Male', 'Female', 'Unknown'),
+      defaultValue: 'Unknown',
+    },
+    color: {
+      type: DataTypes.STRING,
+      defaultValue: '',
+    },
+    microchipId: {
+      type: DataTypes.STRING,
+      defaultValue: '',
+    },
+    ownerName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: { notEmpty: true },
+    },
+    avatarUrl: {
+      type: DataTypes.STRING,
+      defaultValue: '',
+    },
+    _id: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.id;
+      }
+    }
+  }, {
+    timestamps: true,
+  });
 
-module.exports = mongoose.model('Pet', petSchema);
+  return Pet;
+};

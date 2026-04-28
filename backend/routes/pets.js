@@ -1,25 +1,14 @@
-/**
- * pets.js — Express Router
- * ------------------------
- * CRUD endpoints for the Pet collection.
- *
- * GET    /api/pets          — list all pets
- * GET    /api/pets/:id      — get single pet
- * POST   /api/pets          — create pet
- * PUT    /api/pets/:id      — update pet
- * DELETE /api/pets/:id      — delete pet (cascades to logs & records)
- * POST   /api/pets/:id/weight — push a new weight entry
- */
 const express = require('express');
 const router  = express.Router();
-const Pet          = require('../models/Pet');
-const DailyLog     = require('../models/DailyLog');
-const MedicalRecord = require('../models/MedicalRecord');
+const db = require('../models');
 
 /* ── GET /api/pets ──────────────────────────────────────── */
 router.get('/', async (req, res) => {
   try {
-    const pets = await Pet.find().sort({ createdAt: -1 });
+    const pets = await db.Pet.findAll({
+      order: [['createdAt', 'DESC']],
+      include: [{ model: db.WeightEntry, as: 'weightHistory' }]
+    });
     res.json(pets);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -29,7 +18,9 @@ router.get('/', async (req, res) => {
 /* ── GET /api/pets/:id ──────────────────────────────────── */
 router.get('/:id', async (req, res) => {
   try {
-    const pet = await Pet.findById(req.params.id);
+    const pet = await db.Pet.findByPk(req.params.id, {
+      include: [{ model: db.WeightEntry, as: 'weightHistory' }]
+    });
     if (!pet) return res.status(404).json({ message: 'Pet not found' });
     res.json(pet);
   } catch (err) {
@@ -40,9 +31,8 @@ router.get('/:id', async (req, res) => {
 /* ── POST /api/pets ─────────────────────────────────────── */
 router.post('/', async (req, res) => {
   try {
-    const pet = new Pet(req.body);
-    const saved = await pet.save();
-    res.status(201).json(saved);
+    const pet = await db.Pet.create(req.body);
+    res.status(201).json(pet);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -51,12 +41,12 @@ router.post('/', async (req, res) => {
 /* ── PUT /api/pets/:id ──────────────────────────────────── */
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await Pet.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!updated) return res.status(404).json({ message: 'Pet not found' });
+    const pet = await db.Pet.findByPk(req.params.id);
+    if (!pet) return res.status(404).json({ message: 'Pet not found' });
+    await pet.update(req.body);
+    const updated = await db.Pet.findByPk(req.params.id, {
+      include: [{ model: db.WeightEntry, as: 'weightHistory' }]
+    });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -66,15 +56,10 @@ router.put('/:id', async (req, res) => {
 /* ── DELETE /api/pets/:id ───────────────────────────────── */
 router.delete('/:id', async (req, res) => {
   try {
-    const pet = await Pet.findByIdAndDelete(req.params.id);
+    const pet = await db.Pet.findByPk(req.params.id);
     if (!pet) return res.status(404).json({ message: 'Pet not found' });
 
-    // Cascade delete related documents
-    await Promise.all([
-      DailyLog.deleteMany({ petId: req.params.id }),
-      MedicalRecord.deleteMany({ petId: req.params.id }),
-    ]);
-
+    await pet.destroy(); // Cascade is handled by model associations
     res.json({ message: 'Pet and all related data deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -84,14 +69,16 @@ router.delete('/:id', async (req, res) => {
 /* ── POST /api/pets/:id/weight ──────────────────────────── */
 router.post('/:id/weight', async (req, res) => {
   try {
-    const { date, weight } = req.body;
-    const pet = await Pet.findByIdAndUpdate(
-      req.params.id,
-      { $push: { weightHistory: { date, weight } } },
-      { new: true, runValidators: true }
-    );
+    const pet = await db.Pet.findByPk(req.params.id);
     if (!pet) return res.status(404).json({ message: 'Pet not found' });
-    res.json(pet);
+
+    const { date, weight } = req.body;
+    await db.WeightEntry.create({ date, weight, petId: pet.id });
+
+    const updated = await db.Pet.findByPk(req.params.id, {
+      include: [{ model: db.WeightEntry, as: 'weightHistory' }]
+    });
+    res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

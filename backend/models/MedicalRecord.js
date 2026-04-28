@@ -1,63 +1,57 @@
-/**
- * MedicalRecord.js — Mongoose Model
- * -----------------------------------
- * Tracks vet visits, vaccines, and surgeries for a pet.
- */
-const mongoose = require('mongoose');
-
-const medicalRecordSchema = new mongoose.Schema(
-  {
+module.exports = (sequelize, DataTypes) => {
+  const MedicalRecord = sequelize.define('MedicalRecord', {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
     petId: {
-      type:     mongoose.Schema.Types.ObjectId,
-      ref:      'Pet',
-      required: [true, 'petId is required'],
-      index:    true,
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
     type: {
-      type:     String,
-      enum:     ['Vaccine', 'Checkup', 'Surgery'],
-      required: [true, 'Record type is required'],
+      type: DataTypes.ENUM('Vaccine', 'Checkup', 'Surgery'),
+      allowNull: false,
     },
     description: {
-      type:     String,
-      required: [true, 'Description is required'],
-      trim:     true,
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: { notEmpty: true },
     },
     date: {
-      type:     Date,
-      required: [true, 'Date is required'],
+      type: DataTypes.DATE,
+      allowNull: false,
     },
     nextDueDate: {
-      type:    Date,
-      default: null,
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     vet: {
-      type:    String,
-      default: '',
-      trim:    true,
+      type: DataTypes.STRING,
+      defaultValue: '',
     },
     clinic: {
-      type:    String,
-      default: '',
-      trim:    true,
+      type: DataTypes.STRING,
+      defaultValue: '',
     },
-    // Derived: 'upcoming' if date is in the future, 'completed' if in the past
-    // Stored for fast filter queries
     status: {
-      type:    String,
-      enum:    ['upcoming', 'completed'],
-      default: 'upcoming',
+      type: DataTypes.ENUM('upcoming', 'completed'),
+      defaultValue: 'upcoming',
     },
-  },
-  { timestamps: true }
-);
+    _id: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.id;
+      }
+    }
+  }, {
+    timestamps: true,
+    hooks: {
+      beforeSave: (record) => {
+        record.status = new Date(record.date) > new Date() ? 'upcoming' : 'completed';
+      }
+    }
+  });
 
-// Auto-set status before saving
-medicalRecordSchema.pre('save', function (next) {
-  this.status = this.date > new Date() ? 'upcoming' : 'completed';
-  next();
-});
-
-medicalRecordSchema.index({ petId: 1, date: -1 });
-
-module.exports = mongoose.model('MedicalRecord', medicalRecordSchema);
+  return MedicalRecord;
+};

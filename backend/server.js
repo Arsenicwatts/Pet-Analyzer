@@ -7,7 +7,7 @@
 
 require('dotenv').config();
 const express   = require('express');
-const mongoose  = require('mongoose');
+const db        = require('./models');
 const cors      = require('cors');
 const helmet    = require('helmet');
 const morgan    = require('morgan');
@@ -52,27 +52,22 @@ app.use((err, req, res, _next) => {
   });
 });
 
-/* ── Connect to MongoDB (real or in-memory) ──────────────── */
+/* ── Connect to Database ─────────────────────────────────────── */
 async function startServer() {
-  let mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/petpassport';
-
-  // Try the configured URI first; fall back to in-memory MongoDB
   try {
-    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
-    console.log('✅  Connected to MongoDB at', mongoUri);
-  } catch (err) {
-    console.warn('⚠️  Could not connect to', mongoUri, '— falling back to in-memory MongoDB.');
-    const { MongoMemoryServer } = require('mongodb-memory-server');
-    const mongod = await MongoMemoryServer.create();
-    mongoUri = mongod.getUri();
-    await mongoose.connect(mongoUri);
-    console.log('✅  Connected to IN-MEMORY MongoDB (data resets on restart)');
-    console.log('   URI:', mongoUri);
-  }
+    await db.sequelize.authenticate();
+    console.log('✅  Connected to MySQL Database via Sequelize.');
+    // Sync models (creates tables if they don't exist)
+    await db.sequelize.sync({ alter: true });
+    console.log('✅  Database synchronized.');
 
-  app.listen(PORT, () =>
-    console.log(`🚀  PetPassport API running on http://localhost:${PORT}`)
-  );
+    app.listen(PORT, () =>
+      console.log(`🚀  PetPassport API running on http://localhost:${PORT}`)
+    );
+  } catch (err) {
+    console.error('❌  Unable to connect to the database:', err);
+    process.exit(1);
+  }
 }
 
 startServer().catch(err => {
